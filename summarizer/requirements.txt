@@ -1,6 +1,0 @@
-streamlit
-openai>=1.0.0
-python-dotenv
-PyPDF2
-requests
-beautifulsoup4
