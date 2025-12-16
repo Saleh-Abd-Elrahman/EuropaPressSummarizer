@@ -8,7 +8,11 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
-from summarizer import summarize_spanish_article, create_deanna_ministore
+from summarizer import (
+    summarize_spanish_article,
+    create_deanna_ministore,
+    summarize_article_overall,   # ✅ NEW
+)
 
 load_dotenv()
 
@@ -27,6 +31,7 @@ class AnalyzeUrlRequest(BaseModel):
 
 
 class AnalyzeResponse(BaseModel):
+    summary: str                 # ✅ NEW
     topics: List[str]
     ministores: List[str]
 
@@ -39,20 +44,23 @@ async def health():
 @app.post("/analyze", response_model=AnalyzeResponse)
 async def analyze(req: AnalyzeRequest):
     """
-    Given article text, return two commercial topics and their ministore URLs.
+    Given article text, return summary + two commercial topics and their ministore URLs.
     """
     if not req.text.strip():
         raise HTTPException(status_code=400, detail="Empty text")
 
     try:
-        topics = summarize_spanish_article(req.text)
+        # ✅ NEW: overall summary (does not change topic logic)
+        summary = summarize_article_overall(req.text)
 
+        # existing logic unchanged
+        topics = summarize_spanish_article(req.text)
         if not topics or len(topics) == 0:
             raise HTTPException(status_code=500, detail="No topics extracted")
 
         ministores = [create_deanna_ministore(t) for t in topics]
 
-        return AnalyzeResponse(topics=topics, ministores=ministores)
+        return AnalyzeResponse(summary=summary, topics=topics, ministores=ministores)
 
     except HTTPException:
         raise
@@ -63,21 +71,18 @@ async def analyze(req: AnalyzeRequest):
 def extract_text_from_html(html: str) -> str:
     """
     Extract main article text from full HTML.
-    This should mimic what worked for you in the Streamlit version:
     - Prefer article > p
     - Fallback to all <p>
     - Fallback to all text
     """
     soup = BeautifulSoup(html, "html.parser")
 
-    # 1) paragraphs inside <article>
     paragraphs = [
         p.get_text(strip=True)
         for p in soup.select("article p")
         if p.get_text(strip=True)
     ]
 
-    # 2) fallback: all <p>
     if not paragraphs:
         paragraphs = [
             p.get_text(strip=True)
@@ -100,8 +105,7 @@ def extract_text_from_html(html: str) -> str:
 @app.post("/analyze_url", response_model=AnalyzeResponse)
 async def analyze_url(req: AnalyzeUrlRequest):
     """
-    Given an article URL, fetch the HTML, extract text, and return topics + ministores.
-    This mirrors the Streamlit behaviour.
+    Given an article URL, fetch HTML, extract text, return summary + topics + ministores.
     """
     url = req.url.strip()
     if not url:
@@ -128,23 +132,21 @@ async def analyze_url(req: AnalyzeUrlRequest):
     html = resp.text
     article_text = extract_text_from_html(html)
 
-    # Only fail if we literally got nothing at all
     if not article_text:
-        raise HTTPException(
-            status_code=500,
-            detail="No se ha podido extraer texto del artículo",
-        )
-
+        raise HTTPException(status_code=500, detail="No se ha podido extraer texto del artículo")
 
     try:
-        topics = summarize_spanish_article(article_text)
+        # ✅ NEW
+        summary = summarize_article_overall(article_text)
 
+        # existing logic unchanged
+        topics = summarize_spanish_article(article_text)
         if not topics or len(topics) == 0:
             raise HTTPException(status_code=500, detail="No topics extracted")
 
         ministores = [create_deanna_ministore(t) for t in topics]
 
-        return AnalyzeResponse(topics=topics, ministores=ministores)
+        return AnalyzeResponse(summary=summary, topics=topics, ministores=ministores)
 
     except HTTPException:
         raise
