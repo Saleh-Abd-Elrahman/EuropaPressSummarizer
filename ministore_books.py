@@ -41,6 +41,7 @@ def create_book_from_topic(
     fecha_str_day = now.strftime("%d/%m/%Y")
     created_ts = now.strftime("%Y-%m-%d %H:%M:%S")
     slug_ts = now.strftime("%d-%m-%Y-%H%M%S")
+    fecha_str_americana = now.strftime("%Y-%m-%d %H:%M:%S")
 
     slug = f"{slug_prefix}-{slug_ts}"
     name = f"{topic} - {fecha_str_day}"
